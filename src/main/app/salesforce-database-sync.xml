@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+    <flow name="receiveTopicSubscriptionFlow">
+        <sfdc:subscribe-topic config-ref="Salesforce__Basic_Authentication" topic="AccountUpdates" doc:name="Salesforce (Streaming)"/>
+        <validation:is-true config-ref="Validation_Configuration" message="The operation type could not be determined.#['\n\nPayload:\n' + payload]" expression="#[message.inboundProperties.type == 'created' || message.inboundProperties.type == 'updated' || message.inboundProperties.type == 'deleted']" doc:name="Validate Type"/>
+        <flow-ref name="syncDatabaseFlow" doc:name="syncDatabaseFlow"/>
+    </flow>
+    <flow name="syncDatabaseFlow">
+        <choice doc:name="Determine Operation Type">
+            <when expression="#[message.inboundProperties.type == 'deleted']">
+                <db:delete config-ref="MySQL_Configuration" doc:name="Delete Account">
+                    <db:parameterized-query><![CDATA[DELETE
+FROM Accounts
+WHERE Id = #[payload.Id]]]></db:parameterized-query>
+                </db:delete>
+            </when>
+            <when expression="#[message.inboundProperties.type == 'created']">
+                <db:insert config-ref="MySQL_Configuration" doc:name="Create Account">
+                    <db:parameterized-query><![CDATA[insert into Accounts (Id, AccountNumber, Name, Phone)
+
+values
+#[payload.Id],
+#[payload.AccountNumber],
+#[payload.Name],
+#[payload.Phone]]]></db:parameterized-query>
+                </db:insert>
+            </when>
+            <when expression="#[message.inboundProperties.type == 'updated']">
+                <db:update config-ref="MySQL_Configuration" doc:name="Update Account">
+                    <db:parameterized-query><![CDATA[UPDATE Accounts
+
+SET
+AccountNumber = #[payload.AccountNumber],
+Name = #[payload.Name],
+Phone = #[payload.Phone]
+
+WHERE Id = #[payload.Id]]]></db:parameterized-query>
+                </db:update>
+            </when>
+            <otherwise>
+                <logger message="Operation type could not be dermined. The synchronization operation failed on record $[payload.Id]" level="ERROR" doc:name="Logger" category="salesforce-database-stnc"/>
+            </otherwise>
+        </choice>
+        <logger message="The synchronization operation '#[message.inboundProperties.type] completed successfully on record $[payload.Id]" level="INFO" category="salesforce-database-sync" doc:name="Logger"/>
+    </flow>
+    <catch-exception-strategy name="salesforce-database-syncCatch_Exception_Strategy">
+        <logger message="The synchronization operation failed on record $[payload.Id + #[resultArray=exception.getCauseException().getMessage().ssplit(&quot;\\n&quot;); result=resultArray[0].replace(&quot;\&quot;&quot;,&quot;\\\&quot;&quot;);" level="ERROR" category="salesforce-database-sync" doc:name="Logger"/>
+    </catch-exception-strategy>
+</mule>

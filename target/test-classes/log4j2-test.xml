@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO" name="cloudhub" packages="com.mulesoft.ch.logging.appender">
+    <Appenders>
+        <RollingFile name="FILE"
+                     fileName="/opt/mule/mule-CURRENT/logs/mule-${sys:domain}.log"
+                     filePattern="/opt/mule/mule-CURRENT/logs/mule-${sys:domain}-%i.log">
+
+            <PatternLayout pattern="[%d{MM-dd HH:mm:ss.SSS}] %-5p %c{1} [%t]: %m%n"/>
+            <DefaultRolloverStrategy max="10"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB" />
+            </Policies>
+        </RollingFile>
+        <Log4J2CloudhubLogAppender name="CLOUDHUB"
+                                   addressProvider="com.mulesoft.ch.logging.DefaultAggregatorAddressProvider"
+                                   applicationContext="com.mulesoft.ch.logging.DefaultApplicationContext"
+                                   appendRetryIntervalMs="${sys:logging.appendRetryInterval}"
+                                   appendMaxAttempts="${sys:logging.appendMaxAttempts}"
+                                   batchSendIntervalMs="${sys:logging.batchSendInterval}"
+                                   batchMaxRecords="${sys:logging.batchMaxRecords}"
+                                   memBufferMaxSize="${sys:logging.memBufferMaxSize}"
+                                   journalMaxWriteBatchSize="${sys:logging.journalMaxBatchSize}"
+                                   journalMaxFileSize="${sys:logging.journalMaxFileSize}"
+                                   clientMaxPacketSize="${sys:logging.clientMaxPacketSize}"
+                                   clientConnectTimeoutMs="${sys:logging.clientConnectTimeout}"
+                                   clientSocketTimeoutMs="${sys:logging.clientSocketTimeout}"
+                                   serverAddressPollIntervalMs="${sys:logging.serverAddressPollInterval}"
+                                   serverHeartbeatSendIntervalMs="${sys:logging.serverHeartbeatSendIntervalMs}"
+                                   statisticsPrintIntervalMs="${sys:logging.statisticsPrintIntervalMs}">
+
+            <PatternLayout pattern="[%d{MM-dd HH:mm:ss}] %-5p %c{1} [%t]: %m%n"/>
+        </Log4J2CloudhubLogAppender>
+    </Appenders>
+    <Loggers>
+        <Root level="INFO">
+            <AppenderRef ref="FILE"/>
+            <AppenderRef ref="CLOUDHUB"/>
+        </Root>
+        <Logger name="com.gigaspaces" level="ERROR"/>
+        <Logger name="com.j_spaces" level="ERROR"/>
+        <Logger name="com.sun.jini" level="ERROR"/>
+        <Logger name="net.jini" level="ERROR"/>
+        <Logger name="org.apache" level="WARN"/>
+        <Logger name="org.apache.cxf" level="WARN"/>
+        <Logger name="org.springframework.beans.factory" level="WARN"/>
+        <Logger name="org.mule" level="INFO"/>
+        <Logger name="com.mulesoft" level="INFO"/>
+        <Logger name="org.jetel" level="WARN"/>
+        <Logger name="Tracking" level="WARN"/>
+    </Loggers>
+</Configuration>
